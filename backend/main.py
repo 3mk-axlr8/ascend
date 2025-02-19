@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from ascend.checkFile import router as check_file_router
 from ascend.promptCreate import router as prompt_router
+from ascend.startProject import router as start_project_router
 
 
 app = FastAPI()
@@ -18,3 +19,4 @@ app.add_middleware(
 # Include the router
 app.include_router(check_file_router)
 app.include_router(prompt_router)
+app.include_router(start_project_router)

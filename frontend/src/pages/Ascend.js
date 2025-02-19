@@ -17,7 +17,16 @@ export default function FileUpload() {
 
   const [tagIdentifier, setTagIdentifier] = useState("");
 
-  const [promptHidden, setPromptHidden] = useState(false)
+  const [promptHidden, setPromptHidden] = useState(false);
+
+  const [projectName, setProjectName] = useState("");
+
+  const [shownFiles, setShownFiles] = useState([]);
+  const [shownPrompts, setShownPrompts] = useState([]);
+
+  const [selectedFile, setSelectedFile] = useState("");
+  const [selectedFilePreview, setSelectedFilePreview] = useState(null)
+  const [selectedPrompts, setSelectedPrompts] = useState([]);
 
 
   // Fetch logged-in user's email
@@ -36,6 +45,19 @@ export default function FileUpload() {
     getUser();
   }, []);
 
+  // Fetch files
+  useEffect(() => {
+    if (userEmail) {
+      fetchFiles();
+    }
+  }, [userEmail]); 
+
+ // Fetch prompts
+ useEffect(() => {
+  if (userEmail) {
+    fetchPrompts();
+  }
+}, [userEmail]); 
   // Handle File Selection
   const handleFileChange = (e) => {
     setFile(null);
@@ -192,6 +214,98 @@ export default function FileUpload() {
 
   }
 
+  const fetchFiles = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/get_files?email=${userEmail}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setShownFiles(data.files);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    }
+  };
+  
+  const fetchPrompts = async () => {
+    try {
+      const response = await fetch(`http://127.0.0.1:8000/get_prompts?email=${userEmail}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setShownPrompts(data.prompts);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    }
+  };
+
+  const handlePreview = async (file_name) => {
+
+    try {
+      setSelectedFile(file_name)
+      const response = await fetch(`http://127.0.0.1:8000/get_preview?file_id=${file_name}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setSelectedFilePreview(data.preview);
+    } catch (error) {
+      console.error("Error fetching files:", error);
+    }
+
+    
+  }
+
+  const handlePrompt = async(e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    setSelectedPrompts(selectedOptions);
+  }
+
+
+  
+  const submitRequest = async() => {
+    if(!userEmail || selectedFile == "" || selectedPrompts.length === 0){
+      alert("error");
+      return;
+    }
+
+    try{
+      const formData = new FormData();
+      formData.append("user_email", userEmail);
+      formData.append("file", selectedFile);
+      formData.append("prompts", selectedPrompts);
+
+      const response = await fetch("http://127.0.0.1:8000/submit_tag_request", {
+        method: "POST",
+        body: formData,
+        headers:{
+          "Accept": "application/json"
+        }
+      });
+      
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || "Request failed");
+      }
+
+      alert("Request started successfully!");
+
+      setSelectedFile("");
+      setSelectedFilePreview(null);
+      setSelectedPrompts([])
+      
+    } catch (error){
+      alert(error.message);
+    }
+  }
+
 
   return (
 
@@ -202,6 +316,7 @@ export default function FileUpload() {
       <div className="w-full p-6 bg-white rounded shadow">
         <h1 className="text-2xl font-bold mb-4 text-gray-700">File Upload</h1>
 
+      <div className='flex justify-between items-center'>
         {/* File Input Button */}
         <label
           htmlFor="file-upload"
@@ -209,6 +324,20 @@ export default function FileUpload() {
         >
           Select File
         </label>
+
+        <button
+          type="button"
+          onClick={() => {
+            setFile(null);
+            setPreviewData(null);
+            setUploadEnabled(false);
+          } }
+          className="py-2 bg-gray-500 text-white rounded cursor-pointer hover:bg-gray-600 block w-fit px-8"
+        >
+          Clear
+          </button>
+        </div>
+
         <input
           id="file-upload"
           type="file"
@@ -416,6 +545,108 @@ export default function FileUpload() {
 
       </div>
 
+
+      <div className="w-full p-6 bg-white rounded shadow">
+      <h1 className="text-2xl font-bold mb-4 text-gray-700">Start Project</h1>
+
+      <label className="block text-gray-700 font-semibold mb-2">
+        Select a File
+        </label>
+      <select
+        id="fileDropdown"
+        className="w-full border border-gray-300 rounded px-3 py-2 mb-4"
+        value={selectedFile}
+        onChange={(e) => {
+          const newFileValue = e.target.value
+          handlePreview(newFileValue);
+        }}
+        onClick = {fetchFiles}
+      >
+        <option value="">-- Select a File --</option>
+        {shownFiles.map((file) => (
+          <option key={file.id} value={file.id}>
+            {`${file.original_file_name} • ${file.upload_timestamp} • ${file.num_rows} companies`}
+          </option>
+        ))}
+      </select>
+
+              {/* Preview Table */}
+        {selectedFilePreview && (
+          <div className="m-6">
+            <h2 className="text-lg font-semibold mb-2">Preview ( {selectedFilePreview.len <= 10 ? selectedFilePreview.len + " rows" : "10 / " + selectedFilePreview.len + " rows"} )</h2>
+            <div className="overflow-x-auto max-h-64 border rounded bg-white p-2">
+              <table className="w-full border-collapse border border-gray-300">
+                <thead>
+                  <tr className="bg-gray-200">
+                    {selectedFilePreview.headers.map((header, index) => (
+                      <th key={index} className="border px-3 py-1 text-left text-sm font-semibold">
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedFilePreview.rows.map((row, rowIndex) => (
+                    <tr key={rowIndex} className="border-b">
+                      {row.map((cell, cellIndex) => (
+                        <td key={cellIndex} className="border px-3 py-1 text-sm">
+                          {cell || '-'}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
+      <label className="block text-gray-700 font-semibold mb-2">
+        Select Prompts
+        </label>
+      <select
+        multiple
+        id="promptDropdown"
+        className="w-full h-64 border border-gray-300 rounded px-3 py-2 mb-4"
+        value={selectedPrompts}
+        onChange={handlePrompt}
+      >
+        <option value="">-- Select Prompts --</option>
+        {shownPrompts.map((prompt) => (
+          <option key={prompt.id} value={prompt.id}>
+            {`${prompt.tag_identifier} • ${prompt.tag_type} • ${prompt.tag_name} • ${prompt.tag_desc}`}
+          </option>
+        ))}
+      </select>
+
+      <div className='w-full border border-gray-300 rounded px-3 py-2 mb-4'>
+        {
+          shownPrompts.filter(prompt => selectedPrompts.includes(prompt.id)).map((prompt) => (
+          <div className="border border-gray-300 rounded-lg p-4 shadow-md bg-white w-full max-w-md my-4">
+            <div className='flex gap-4'>
+              <p className="text-sm text-black bg-gray-100 p-2 mx-4 rounded-lg">{prompt.tag_identifier}</p>
+              <p className="text-sm text-white bg-blue-500 p-2 mx-4 rounded-lg">{prompt.tag_type}</p>
+            </div>
+            
+            <h2 className="text-lg font-semibold text-black">{prompt.tag_name}</h2>
+            <p className="text-sm text-black">{prompt.tag_desc}</p>
+            
+          </div>
+          ))
+        }
+
+      </div >
+
+      <button
+          type="button"
+          onClick={submitRequest}
+          className="py-2 bg-blue-500 text-white rounded cursor-pointer hover:bg-blue-600 block w-fit px-8"
+        >
+          Submit
+      </button>
+
+      </div>
     </div>
   );
 }
