@@ -78,7 +78,7 @@ export default function FileUpload() {
     formData.append("user_email", userEmail);
 
     try {
-      const response = await fetch("https://ascend-backend-pi.vercel.app/api/validate-file", {
+      const response = await fetch("http://127.0.0.1:8000/validate-file", {
         method: "POST",
         body: formData,
       });
